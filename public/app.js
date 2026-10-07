@@ -1,21 +1,627 @@
-const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-let state={page:'dashboard',network:null,path:[],failed:null};
-const api=async(url,body)=>{const r=await fetch(url,{method:body?'POST':'GET',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});return r.json()};
-function login(){document.body.innerHTML=`<div class="login"><div class="login-card"><div class="logo"><div class="logo-mark">⌁</div><div>Campus Cable Planner</div></div><div class="eyebrow" style="margin-top:28px">Network Operations</div><h1>Welcome back</h1><p class="muted">Sign in to manage the campus cable network.</p><form id="lf"><div class="field"><label>Username</label><input id="u" value="Name" required></div><div class="field"><label>Password</label><input id="p" type="password" value="1234" required></div><button class="primary full">Sign in</button><div id="le"></div></form><div class="footer-note">Campus infrastructure monitoring & route planning</div></div></div>`;$('#lf').onsubmit=async e=>{e.preventDefault();let r=await api('/api/login',{username:$('#u').value,password:$('#p').value});if(r.ok){sessionStorage.logged='1';loadApp()}else $('#le').innerHTML='<div class="error">'+r.message+'</div>'}}
-function loadApp(){document.body.innerHTML=`<div class="shell"><aside class="sidebar" id="side"><div class="brand"><div class="logo"><div class="logo-mark">⌁</div><span>CCP</span></div><div class="muted" style="font-size:11px;margin:8px 2px">Campus Cable Planner</div></div><nav class="nav">${[['dashboard','▦','Dashboard'],['map','⌘','Network Map'],['search','⌕','Cable Search'],['shortest','↝','Shortest Path'],['failure','⚠','Cable Failure'],['tech','♙','Technician Dispatch'],['traffic','◉','Traffic Controller'],['data','▤','Network Data']].map(x=>`<button data-page="${x[0]}"><span>${x[1]}</span>${x[2]}</button>`).join('')}</nav><div class="side-bottom"><button class="secondary" id="settings">⚙ Settings</button><button class="danger" id="logout">↪ Logout</button></div></aside><main class="main"><header class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="mobile-menu" id="mob">☰</button><div><div style="font-weight:700" id="topTitle">Dashboard</div><div class="muted" style="font-size:11px">Network operations center</div></div></div><div class="badge blue">● System Online</div></header><section class="content" id="view"></section></main></div>`;$$('[data-page]').forEach(b=>b.onclick=()=>{state.page=b.dataset.page;render()});$('#logout').onclick=()=>{sessionStorage.clear();login()};$('#settings').onclick=()=>alert('Account settings are available in the original C++ project.');$('#mob').onclick=()=>$('#side').classList.toggle('open');api('/api/network').then(n=>{state.network=n;render()})}
-const nodeOptions=()=>state.network.nodes.map(n=>`<option value="${n.name}">${n.name}</option>`).join('');
-function header(title,sub,action=''){return `<div class="page-title"><div><div class="eyebrow">Campus Cable Planner</div><h1>${title}</h1><div class="muted">${sub}</div></div>${action}</div>`}
-function render(){if(!state.network)return;$$('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===state.page));let names={dashboard:'Dashboard',map:'Network Map',search:'Cable Search',shortest:'Shortest Path',failure:'Cable Failure',tech:'Technician Dispatch',traffic:'Traffic Controller',data:'Network Data'};$('#topTitle').textContent=names[state.page];({dashboard:dashboard,map:networkMap,search:cableSearch,shortest:shortest,failure:failure,tech:technician,traffic:traffic,data:networkData}[state.page])();}
-function dashboard(){let n=state.network.nodes.length,e=state.network.edges.length,len=state.network.edges.reduce((a,x)=>a+x.length,0),cost=state.network.edges.reduce((a,x)=>a+x.cost,0),load=state.network.edges.reduce((a,x)=>a+x.currentLoad,0),cap=state.network.edges.reduce((a,x)=>a+x.capacity,0);$('#view').innerHTML=header('Network Overview','A live view of campus cable infrastructure.')+`<div class="grid stats"><div class="card stat"><div class="label">Campus Nodes</div><div class="value">${n}</div><div class="sub">Buildings & locations</div></div><div class="card stat"><div class="label">Cable Connections</div><div class="value">${e}</div><div class="sub">Active network links</div></div><div class="card stat"><div class="label">Network Length</div><div class="value">${len.toLocaleString()} m</div><div class="sub">Total installed cable</div></div><div class="card stat"><div class="label">Current Utilization</div><div class="value">${Math.round(load/cap*100)}%</div><div class="sub">${load} / ${cap} Mbps</div></div></div><div class="grid two" style="margin-top:18px"><div class="card map-card"><div class="section-head"><h3>Campus Network</h3><button class="secondary" onclick="state.page='map';render()">Open full map</button></div>${mapSvg()}</div><div class="card"><div class="section-head"><h3>Quick Actions</h3></div><div class="grid" style="gap:10px">${[['shortest','Find a shortest route'],['failure','Simulate cable failure'],['traffic','Check bandwidth route'],['tech','Dispatch technicians']].map(x=>`<button class="secondary" onclick="state.page='${x[0]}';render()" style="text-align:left">${x[1]} <span style="float:right">→</span></button>`).join('')}</div><div class="notice" style="margin-top:18px"><b>Network cost:</b> Tk. ${cost.toLocaleString()}<br><span class="muted">All values are based on the original project dataset.</span></div></div></div>`}
-function positions(){let p={};state.network.nodes.forEach((n,i)=>{let a=(i/state.network.nodes.length)*Math.PI*2;p[n.id]={x:430+270*Math.cos(a),y:245+180*Math.sin(a)}});return p}
-function mapSvg(highlight=[]){let p=positions();return `<svg class="map" viewBox="0 0 860 500">${state.network.edges.map(e=>{let a=p[e.source],b=p[e.target],hot=state.network.edges.indexOf(e)===state.failed?'failed':(e.currentLoad/e.capacity>.75?'hot':'');let hl=highlight.some(x=>x===e.sourceName||x===e.targetName);return `<line class="${hot}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" opacity="${highlight.length&&!hl?.18:1}"/>`}).join('')}${state.network.nodes.map(n=>{let q=p[n.id],sel=highlight.includes(n.name);return `<g><circle class="${sel?'selected':''}" cx="${q.x}" cy="${q.y}" r="7"/><text x="${q.x+10}" y="${q.y+4}">${n.name}</text></g>`}).join('')}</svg>`}
-function networkMap(){let hl=state.path||[];$('#view').innerHTML=header('Interactive Network Map','Explore nodes, connections and live cable capacity.')+`<div class="grid two"><div class="card map-card"><div class="toolbar"><input id="mapSearch" class="field input" placeholder="Search building..." style="flex:1;min-width:220px;margin:0;padding:11px;background:#091727;border:1px solid #29415e;color:white;border-radius:11px"><button class="secondary" onclick="state.path=[];render()">Reset highlight</button></div><div style="margin-top:14px">${mapSvg(hl)}</div></div><div class="card"><div class="section-head"><h3>Connections</h3><span class="muted">${state.network.edges.length} links</span></div><div class="mini-list">${state.network.edges.map((e,i)=>`<div class="mini" onclick="showEdge(${i})" style="cursor:pointer"><strong>${e.sourceName} → ${e.targetName}</strong><div class="muted" style="font-size:11px;margin-top:5px">${e.length} m · Tk. ${e.cost.toLocaleString()} · ${e.currentLoad}/${e.capacity} Mbps</div></div>`).join('')}</div></div></div>`;$('#mapSearch').oninput=e=>{let q=e.target.value.toLowerCase();state.path=state.network.nodes.filter(n=>n.name.toLowerCase().includes(q)).map(n=>n.name);render()}}
-function showEdge(i){let e=state.network.edges[i];alert(`${e.sourceName} → ${e.targetName}\nLength: ${e.length} m\nCost: Tk. ${e.cost}\nCapacity: ${e.capacity} Mbps\nCurrent Load: ${e.currentLoad} Mbps\nAvailable: ${e.available} Mbps`)}
-function cableSearch(){ $('#view').innerHTML=header('Cable Search','Find every cable connection associated with a campus location.')+`<div class="card"><div class="toolbar"><select id="cs" style="flex:1;min-width:240px"><option value="">Select building</option>${nodeOptions()}</select><button class="primary" id="go">Search connections</button></div><div id="res" class="result"></div></div>`;$('#go').onclick=async()=>{let r=await api('/api/cable-search',{name:$('#cs').value});$('#res').innerHTML=r.ok?table(r.results):`<div class="error">${r.error}</div>`}}
-function table(rows){if(!rows.length)return '<div class="notice">No connections found.</div>';return `<div class="table-wrap"><table><thead><tr><th>Connection</th><th>Length</th><th>Cost</th><th>Capacity</th><th>Load</th><th>Available</th><th>Status</th></tr></thead><tbody>${rows.map(e=>`<tr><td>${e.sourceName} → ${e.targetName}</td><td>${e.length} m</td><td>Tk. ${e.cost.toLocaleString()}</td><td>${e.capacity} Mbps</td><td>${e.currentLoad} Mbps</td><td>${e.available} Mbps</td><td><span class="badge ${e.currentLoad/e.capacity>.8?'warning':'ok'}">${e.currentLoad/e.capacity>.8?'HIGH LOAD':'HEALTHY'}</span></td></tr>`).join('')}</tbody></table></div>`}
-function shortest(){ $('#view').innerHTML=header('Shortest Path Finder','Run the original Dijkstra-based shortest route calculation.')+`<div class="card"><div class="grid three"><div class="field"><label>Starting point</label><select id="s">${nodeOptions()}</select></div><div class="field"><label>Destination</label><select id="d">${nodeOptions()}</select></div><div class="field" style="display:flex;align-items:end"><button class="primary full" id="find">Find shortest path</button></div></div><div id="sr"></div></div>`;$('#find').onclick=async()=>{let r=await api('/api/shortest-path',{source:$('#s').value,destination:$('#d').value});if(!r.ok){$('#sr').innerHTML='<div class="error">'+r.error+'</div>';return}state.path=r.path;$('#sr').innerHTML=`<div class="result"><div class="notice"><b>Route found.</b> The shortest route has been calculated using cable length.</div><div class="path" style="margin:16px 0">${r.path.map((x,i)=>(i?'<span class="arrow">→</span>':'')+`<span>${x}</span>`).join('')}</div><div class="grid three"><div class="card"><div class="muted">Total Length</div><div class="stat value">${r.totalLength} m</div></div><div class="card"><div class="muted">Total Cost</div><div class="stat value">Tk. ${r.totalCost.toLocaleString()}</div></div><div class="card"><div class="muted">Connections</div><div class="stat value">${r.path.length-1}</div></div></div><div style="margin-top:18px">${mapSvg(r.path)}</div></div>`}}
-function failure(){let opts=state.network.edges.map((e,i)=>`<option value="${i}">${i+1}. ${e.sourceName} → ${e.targetName}</option>`).join('');$('#view').innerHTML=header('Cable Failure Analyzer','Simulate a cable outage and find whether the network can reroute.')+`<div class="card"><div class="toolbar"><select id="fe" style="flex:1">${opts}</select><button class="danger" id="fail">Simulate failure</button></div><div id="fr"></div></div>`;$('#fail').onclick=async()=>{state.failed=+$('#fe').value;let r=await api('/api/cable-failure',{edge:state.failed});let cls=r.status.toLowerCase();$('#fr').innerHTML=`<div class="result"><div class="card" style="border-color:${r.status==='SAFE'?'#246451':r.status==='WARNING'?'#5a4c22':'#6a2c38'}"><span class="badge ${cls}">${r.status}</span><h3>${r.failedEdge.sourceName} → ${r.failedEdge.targetName}</h3><p class="muted">${r.status==='SAFE'?'An alternative route is available and the campus remains connected.':r.status==='WARNING'?'The failure isolates a local location. Cable repair is recommended.':'The failure separates the campus network. Immediate repair is required.'}</p>${r.backupFound?`<div class="path">${r.backupPath.map((x,i)=>(i?'<span class="arrow">→</span>':'')+`<span>${x}</span>`).join('')}</div><p>Backup: <b>${r.backupLength} m</b> · <b>Tk. ${r.backupCost.toLocaleString()}</b></p>`:''}</div><div style="margin-top:18px">${mapSvg(r.backupPath||[])}</div></div>`}}
-function technician(){let buildOpts=nodeOptions();$('#view').innerHTML=header('IT Technician Dispatch','Create a distance matrix and assign technicians using the project’s greedy dispatch logic.')+`<div class="grid two"><div class="card"><div class="section-head"><h3>Technicians</h3><button class="secondary" id="addT">+ Add</button></div><div id="ts"></div><div class="section-head" style="margin-top:22px"><h3>Faults</h3><button class="secondary" id="addF">+ Add</button></div><div id="fs"></div><button class="primary full" style="margin-top:18px" id="dispatch">Run dispatch</button></div><div class="card"><div id="tr"><div class="notice">Add technicians and faults, then run dispatch.</div></div></div></div>`;let tc=0,fc=0;function addT(){tc++;$('#ts').insertAdjacentHTML('beforeend',`<div class="field"><label>Technician-${tc}</label><select class="t">${buildOpts}</select></div>`)}function addF(){fc++;$('#fs').insertAdjacentHTML('beforeend',`<div class="field"><label>Fault-${fc}</label><select class="f">${buildOpts}</select></div>`)}$('#addT').onclick=addT;$('#addF').onclick=addF;addT();addF();$('#dispatch').onclick=async()=>{let t=$$('.t').map(x=>state.network.nodes.find(n=>n.name===x.value).id),f=$$('.f').map(x=>state.network.nodes.find(n=>n.name===x.value).id);let r=await api('/api/technician-dispatch',{technicians:t,faults:f});if(!r.ok){$('#tr').innerHTML='<div class="error">'+r.error+'</div>';return}$('#tr').innerHTML=`<h3>Distance Matrix</h3><div class="table-wrap"><table><thead><tr><th>Technician</th>${r.matrix[0].map((_,i)=>`<th>Fault-${i+1}</th>`).join('')}</tr></thead><tbody>${r.matrix.map((row,i)=>`<tr><td>Technician-${i+1}</td>${row.map(x=>`<td>${x} m</td>`).join('')}</tr>`).join('')}</tbody></table></div><h3 style="margin-top:22px">Dispatch Report</h3>${r.assignments.map(a=>`<div class="mini" style="margin:8px 0"><b>${a.technician}</b> · ${a.location}<br>${a.fault==='null'||a.fault===null?'<span class="badge blue">AVAILABLE</span>':`→ ${a.faultLocation} · ${a.distance} m · ETA ${a.eta} min <span class="badge ok">DISPATCHED</span>`}</div>`).join('')}<div class="notice" style="margin-top:14px"><b>Total travel:</b> ${r.totalDistance} m · <b>Pending:</b> ${r.pending.length}</div>`}}
-function traffic(){ $('#view').innerHTML=header('Traffic Controller','Check whether a requested bandwidth can be routed through available cable capacity.')+`<div class="card"><div class="grid three"><div class="field"><label>Source</label><select id="tsrc">${nodeOptions()}</select></div><div class="field"><label>Destination</label><select id="tdst">${nodeOptions()}</select></div><div class="field"><label>Required bandwidth (Mbps)</label><input id="bw" type="number" min="1" value="20"></div></div><button class="primary" id="trafficGo">Check traffic-aware route</button><div id="rr"></div></div><div class="card" style="margin-top:18px"><div class="section-head"><h3>Live Cable Traffic</h3><span class="muted">Capacity monitoring</span></div>${table(state.network.edges)}</div>`;$('#trafficGo').onclick=async()=>{let r=await api('/api/traffic',{source:$('#tsrc').value,destination:$('#tdst').value,bandwidth:+$('#bw').value});if(!r.ok){$('#rr').innerHTML='<div class="error">'+r.error+'</div>';return}$('#rr').innerHTML=`<div class="result"><div class="notice">${r.trafficFound?'<b>Route available.</b> Every selected cable has enough remaining capacity.':'<b>BLOCKED.</b> No route has enough bandwidth.'}</div>${r.trafficFound?`<div class="path" style="margin-top:15px">${r.trafficPath.map((x,i)=>(i?'<span class="arrow">→</span>':'')+`<span>${x}</span>`).join('')}</div><p>Traffic-aware route: <b>${r.trafficLength} m</b> · Tk. <b>${r.trafficCost.toLocaleString()}</b></p>`:''}${r.normalFound?`<p class="muted">Normal shortest route: ${r.normalLength} m.</p>`:''}</div>`}}
-function networkData(){ $('#view').innerHTML=header('Network Data','Inspect the exact nodes and cable dataset used by the application.')+`<div class="card">${table(state.network.edges)}</div>`}
-if(sessionStorage.logged==='1')loadApp();else login();
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700&display=swap');
+
+:root {
+    --bg-dark: #070714;
+    --neon-cyan: #00f0ff;
+    --neon-purple: #9d4edd;
+    --neon-pink: #ff007f;
+    --glass-bg: rgba(20, 20, 35, 0.6);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --text-main: #e0e0ff;
+    --text-muted: #8a8aab;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Montserrat', sans-serif;
+}
+
+body {
+    background: var(--bg-dark);
+    color: var(--text-main);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+/* ================= BACKGROUND ANIMATIONS ================= */
+.bg-animation {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: radial-gradient(circle at 15% 50%, rgba(157, 78, 221, 0.15), transparent 25%),
+        radial-gradient(circle at 85% 30%, rgba(0, 240, 255, 0.15), transparent 25%);
+    z-index: -2;
+}
+
+.floating-shapes {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    overflow: hidden;
+}
+
+.orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(60px);
+    opacity: 0.5;
+    animation: floatOrb 15s infinite alternate ease-in-out;
+}
+
+.orb-1 {
+    width: 300px;
+    height: 300px;
+    background: var(--neon-purple);
+    top: -10%;
+    left: 10%;
+    animation-delay: 0s;
+}
+
+.orb-2 {
+    width: 250px;
+    height: 250px;
+    background: var(--neon-cyan);
+    bottom: -10%;
+    right: 5%;
+    animation-delay: -5s;
+}
+
+.orb-3 {
+    width: 200px;
+    height: 200px;
+    background: var(--neon-pink);
+    top: 40%;
+    left: 40%;
+    animation-delay: -10s;
+}
+
+@keyframes floatOrb {
+    0% {
+        transform: translate(0, 0) scale(1);
+    }
+
+    100% {
+        transform: translate(50px, 50px) scale(1.2);
+    }
+}
+
+/* ================= GLASSMORPHISM ================= */
+.glass-panel {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+}
+
+.glass-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 15px;
+}
+
+/* ================= LOGIN PANEL ================= */
+.login-box {
+    padding: 50px 40px;
+    border-radius: 24px;
+    text-align: center;
+    width: 420px;
+    animation: popCenter 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.floating-panel {
+    animation: floatBox 6s ease-in-out infinite alternate;
+}
+
+@keyframes floatBox {
+    0% {
+        transform: translateY(0);
+    }
+
+    100% {
+        transform: translateY(-10px);
+    }
+}
+
+.glow-icon {
+    font-size: 55px;
+    color: var(--neon-cyan);
+    margin-bottom: 15px;
+    filter: drop-shadow(0 0 10px var(--neon-cyan));
+}
+
+.login-box h2 {
+    font-weight: 700;
+    font-size: 28px;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.typewriter {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-top: 5px;
+    height: 20px;
+}
+
+.input-container {
+    position: relative;
+    margin: 25px 0;
+}
+
+.input-container i {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    transition: 0.3s;
+}
+
+.input-container input:focus+.focus-border+i {
+    color: var(--neon-cyan);
+}
+
+input,
+select {
+    width: 100%;
+    padding: 15px 15px 15px 45px;
+    background: rgba(0, 0, 0, 0.3);
+    border: none;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    font-size: 15px;
+    outline: none;
+    border-radius: 8px 8px 0 0;
+    transition: 0.3s;
+}
+
+.focus-border {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 0;
+    height: 2px;
+    background: var(--neon-cyan);
+    transition: 0.4s ease;
+    transform: translateX(-50%);
+}
+
+input:focus~.focus-border,
+select:focus~.focus-border {
+    width: 100%;
+}
+
+/* ================= BUTTONS & SHINE EFFECT ================= */
+.neon-btn {
+    width: 100%;
+    padding: 15px;
+    background: transparent;
+    border: 2px solid var(--neon-cyan);
+    color: var(--neon-cyan);
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    position: relative;
+    overflow: hidden;
+    transition: 0.4s;
+    z-index: 1;
+}
+
+.neon-btn:hover {
+    background: var(--neon-cyan);
+    color: #000;
+    box-shadow: 0 0 20px var(--neon-cyan);
+}
+
+.action-btn {
+    padding: 15px 30px;
+    background: linear-gradient(45deg, var(--neon-purple), var(--neon-cyan));
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(157, 78, 221, 0.4);
+    transition: 0.3s;
+    position: relative;
+    overflow: hidden;
+}
+
+.action-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0, 240, 255, 0.6);
+}
+
+.warning-btn {
+    background: linear-gradient(45deg, #ff003c, var(--neon-pink));
+    box-shadow: 0 4px 15px rgba(255, 0, 127, 0.4);
+}
+
+.warning-btn:hover {
+    box-shadow: 0 6px 20px rgba(255, 0, 60, 0.6);
+}
+
+/* Shine Sweep Animation */
+.shine-effect::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.3) 50%, rgba(255, 255, 255, 0) 100%);
+    transform: skewX(-20deg);
+    transition: 0s;
+    z-index: -1;
+}
+
+.shine-effect:hover::before {
+    animation: sweep 0.6s;
+}
+
+@keyframes sweep {
+    100% {
+        left: 200%;
+    }
+}
+
+/* ================= DASHBOARD ================= */
+.dashboard {
+    display: flex;
+    width: 95vw;
+    height: 92vh;
+    border-radius: 20px;
+    overflow: hidden;
+    animation: fadeIn 1s;
+}
+
+.sidebar {
+    width: 280px;
+    padding: 30px 20px;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--glass-border);
+}
+
+.sidebar-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.avatar-glow {
+    width: 70px;
+    height: 70px;
+    margin: 0 auto 15px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    color: var(--neon-purple);
+    border: 2px solid var(--neon-purple);
+    box-shadow: 0 0 15px rgba(157, 78, 221, 0.5);
+}
+
+.status-badge {
+    font-size: 12px;
+    color: #00ffaa;
+    background: rgba(0, 255, 170, 0.1);
+    padding: 4px 10px;
+    border-radius: 20px;
+    display: inline-block;
+    margin-top: 5px;
+}
+
+.nav-links {
+    list-style: none;
+    flex-grow: 1;
+}
+
+.nav-links li {
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: 0.3s;
+    display: flex;
+    align-items: center;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.nav-links li i {
+    margin-right: 15px;
+    font-size: 18px;
+    transition: 0.3s;
+}
+
+.nav-links li:hover,
+.nav-links li.active {
+    background: rgba(157, 78, 221, 0.15);
+    color: #fff;
+    transform: translateX(5px);
+}
+
+.nav-links li.active i {
+    color: var(--neon-cyan);
+    filter: drop-shadow(0 0 5px var(--neon-cyan));
+}
+
+.logout-btn {
+    border-color: var(--neon-pink);
+    color: var(--neon-pink);
+    margin-top: auto;
+}
+
+.logout-btn:hover {
+    background: var(--neon-pink);
+    color: #fff;
+    box-shadow: 0 0 20px var(--neon-pink);
+}
+
+/* ================= MAIN CONTENT ================= */
+.content {
+    flex-grow: 1;
+    padding: 50px;
+    overflow-y: auto;
+    position: relative;
+}
+
+.section-header h2 {
+    font-size: 24px;
+    margin-bottom: 8px;
+    color: #fff;
+}
+
+.neon-text {
+    color: var(--neon-cyan);
+    text-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+}
+
+.neon-text-pink {
+    color: var(--neon-pink);
+    text-shadow: 0 0 10px rgba(255, 0, 127, 0.4);
+}
+
+.control-group {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 30px;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.custom-select,
+.custom-input {
+    padding: 12px 15px;
+    border-radius: 8px;
+    border: 1px solid var(--glass-border);
+    background: rgba(20, 20, 35, 0.8);
+}
+
+.result-box {
+    padding: 10px;
+    min-height: 100px;
+}
+
+/* Staggered Pop-in Cards */
+.result-item,
+.path-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01));
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 15px;
+    border-left: 4px solid var(--neon-purple);
+    backdrop-filter: blur(10px);
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.result-item:hover,
+.path-card:hover {
+    transform: translateY(-5px) scale(1.01);
+    border-left-color: var(--neon-cyan);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2), -2px 0 15px rgba(0, 240, 255, 0.3);
+}
+
+.text-pink {
+    color: var(--neon-pink);
+}
+
+.dispatch-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.add-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px dashed var(--text-muted);
+    color: var(--text-main);
+    padding: 12px;
+    width: 100%;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 15px;
+    transition: 0.3s;
+}
+
+.add-btn:hover {
+    border-color: var(--neon-cyan);
+    background: rgba(0, 240, 255, 0.1);
+    color: var(--neon-cyan);
+}
+
+.dynamic-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+    animation: slideInLeft 0.3s ease forwards;
+}
+
+/* Helper classes */
+.mt-15 {
+    margin-top: 15px;
+}
+
+.mb-10 {
+    margin-bottom: 10px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.full-width {
+    width: 100%;
+}
+
+/* Highlights */
+.highlight-cyan {
+    color: var(--neon-cyan);
+    font-weight: 600;
+}
+
+.highlight-purple {
+    color: #d4a5ff;
+    font-weight: 600;
+}
+
+.highlight-green {
+    color: #00ffaa;
+    font-weight: 600;
+    text-shadow: 0 0 8px rgba(0, 255, 170, 0.4);
+}
+
+.highlight-red {
+    color: #ff3366;
+    font-weight: 600;
+    text-shadow: 0 0 8px rgba(255, 51, 102, 0.4);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(157, 78, 221, 0.5);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--neon-cyan);
+}
+
+/* Keyframes */
+@keyframes popCenter {
+    0% {
+        opacity: 0;
+        transform: scale(0.8) translateY(20px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes popInCard {
+    0% {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        text-shadow: 0 0 10px var(--neon-cyan);
+    }
+
+    50% {
+        transform: scale(1.1);
+        text-shadow: 0 0 25px var(--neon-cyan), 0 0 35px var(--neon-purple);
+    }
+
+    100% {
+        transform: scale(1);
+        text-shadow: 0 0 10px var(--neon-cyan);
+    }
+}
+
+@keyframes bounce-x {
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    50% {
+        transform: translateX(5px);
+        color: var(--neon-cyan);
+    }
+}
+
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.animate-slide-up {
+    animation: slideUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+.bounce-x {
+    animation: bounce-x 1.5s infinite;
+}
