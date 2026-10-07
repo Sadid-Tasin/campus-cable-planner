@@ -1,6 +1,0 @@
-services:
-  - type: web
-    name: campus-cable-planner
-    runtime: docker
-    plan: free
-    healthCheckPath: /api/network
