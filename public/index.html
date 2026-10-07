@@ -1,1 +1,156 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Campus Cable Planner</title><link rel="stylesheet" href="/style.css"></head><body><div id="app"></div><script src="/app.js"></script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campus Cable Planner | DIU Premium</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+
+<body>
+
+    <!-- Animated Background & Floating Orbs -->
+    <div class="bg-animation"></div>
+    <div class="floating-shapes">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <!-- Login Panel -->
+    <div id="login-container" class="glass-panel login-box floating-panel">
+        <div class="glow-icon"><i class="fas fa-network-wired pulse"></i></div>
+        <h2>Cable Planner</h2>
+        <p id="typewriter-text" class="typewriter"></p>
+
+        <div class="input-container mt-15">
+            <i class="fas fa-user"></i>
+            <input type="text" id="username" placeholder="Username (e.g., sadid)">
+            <span class="focus-border"></span>
+        </div>
+        <div class="input-container">
+            <i class="fas fa-lock"></i>
+            <input type="password" id="password" placeholder="Password">
+            <span class="focus-border"></span>
+        </div>
+
+        <button class="neon-btn shine-effect mt-15" onclick="handleLogin()">
+            <span>ACCESS SYSTEM</span>
+        </button>
+        <p id="login-error" class="error hidden"><i class="fas fa-exclamation-circle"></i> Access Denied! Invalid
+            Credentials.</p>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboard-container" class="dashboard hidden">
+        <nav class="sidebar glass-panel">
+            <div class="sidebar-header">
+                <div class="avatar-glow"><i class="fas fa-user-astronaut"></i></div>
+                <h3 id="admin-name">Admin</h3>
+                <span class="status-badge"><i class="fas fa-circle"></i> Online</span>
+            </div>
+            <ul class="nav-links">
+                <li onclick="showSection('prob1')" class="active"><i class="fas fa-search"></i> <span>Cable
+                        Search</span></li>
+                <li onclick="showSection('prob2')"><i class="fas fa-route"></i> <span>Shortest Path</span></li>
+                <li onclick="showSection('prob3')"><i class="fas fa-bolt"></i> <span>Failure Analyzer</span></li>
+                <li onclick="showSection('prob4')"><i class="fas fa-users-cog"></i> <span>Tech Dispatch</span></li>
+                <li onclick="showSection('prob5')"><i class="fas fa-traffic-light"></i> <span>Traffic Control</span>
+                </li>
+            </ul>
+            <button onclick="logout()" class="neon-btn logout-btn shine-effect"><i class="fas fa-power-off"></i>
+                Logout</button>
+        </nav>
+
+        <main class="content glass-panel relative-box">
+
+            <!-- Problem 1: Cable Search -->
+            <section id="prob1" class="section animate-slide-up">
+                <div class="section-header">
+                    <h2><i class="fas fa-search neon-text"></i> Network Scanner</h2>
+                    <p>Identify all active connections linked to a specific node.</p>
+                </div>
+                <div class="control-group">
+                    <select id="search-node" class="node-select custom-select"></select>
+                    <button class="action-btn shine-effect" onclick="searchCable()">Scan Network</button>
+                </div>
+                <div id="search-result" class="result-box"></div>
+            </section>
+
+            <!-- Problem 2: Shortest Path -->
+            <section id="prob2" class="section hidden">
+                <div class="section-header">
+                    <h2><i class="fas fa-route neon-text"></i> Route Optimizer</h2>
+                    <p>Calculate the most cost-effective and shortest path between two points.</p>
+                </div>
+                <div class="control-group dual-input">
+                    <select id="start-node" class="node-select custom-select"></select>
+                    <i class="fas fa-angle-double-right transfer-icon bounce-x"></i>
+                    <select id="end-node" class="node-select custom-select"></select>
+                    <button class="action-btn shine-effect" onclick="findShortestPath()">Calculate</button>
+                </div>
+                <div id="path-result" class="result-box"></div>
+            </section>
+
+            <!-- Problem 3: Failure Analyzer -->
+            <section id="prob3" class="section hidden">
+                <div class="section-header">
+                    <h2><i class="fas fa-bolt neon-text-pink"></i> Failure Simulator</h2>
+                    <p>Test network resilience by simulating cable cuts.</p>
+                </div>
+                <div class="control-group">
+                    <select id="fail-edge-select" class="edge-select custom-select"></select>
+                    <button class="action-btn warning-btn shine-effect" onclick="simulateFailure()"><i
+                            class="fas fa-cut"></i> Cut Cable</button>
+                </div>
+                <div id="failure-result" class="result-box"></div>
+            </section>
+
+            <!-- Problem 4: Tech Dispatch -->
+            <section id="prob4" class="section hidden">
+                <div class="section-header">
+                    <h2><i class="fas fa-satellite-dish neon-text"></i> Dispatch AI</h2>
+                    <p>Smart assignment of technicians based on geo-location distances.</p>
+                </div>
+                <div class="dispatch-grid">
+                    <div class="dispatch-col glass-card">
+                        <h3><i class="fas fa-user-check"></i> Available Techs</h3>
+                        <div id="tech-inputs"></div>
+                        <button class="add-btn shine-effect" onclick="addTechInput()">+ Add Tech</button>
+                    </div>
+                    <div class="dispatch-col glass-card">
+                        <h3><i class="fas fa-exclamation-circle text-pink"></i> Reported Faults</h3>
+                        <div id="fault-inputs"></div>
+                        <button class="add-btn shine-effect" onclick="addFaultInput()">+ Add Fault</button>
+                    </div>
+                </div>
+                <button class="action-btn full-width mt-15 shine-effect" style="font-size: 16px;"
+                    onclick="dispatchTechnicians()"><i class="fas fa-cogs"></i> Execute AI Dispatch</button>
+                <div id="dispatch-result" class="result-box mt-15"></div>
+            </section>
+
+            <!-- Problem 5: Traffic Control -->
+            <section id="prob5" class="section hidden">
+                <div class="section-header">
+                    <h2><i class="fas fa-stream neon-text"></i> Traffic Controller</h2>
+                    <p>Guaranteed bandwidth routing avoiding congested paths.</p>
+                </div>
+                <div class="control-group multi-input">
+                    <select id="traffic-start" class="node-select custom-select"></select>
+                    <i class="fas fa-angle-double-right transfer-icon"></i>
+                    <select id="traffic-end" class="node-select custom-select"></select>
+                    <input type="number" id="traffic-bw" class="custom-input" placeholder="Bandwidth (Mbps)" min="1">
+                    <button class="action-btn shine-effect" onclick="checkTrafficRoute()">Analyze</button>
+                </div>
+                <div id="traffic-result" class="result-box"></div>
+            </section>
+
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
