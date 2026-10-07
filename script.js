@@ -27,11 +27,22 @@ const credentials = {
 };
 
 // ================= UI Initialization & Typewriter =================
+// ================= UI Initialization & Typewriter =================
 window.onload = () => {
     populateDropdowns();
     addTechInput();
     addFaultInput();
     typeWriterEffect("System Authentication Required...", document.getElementById("typewriter-text"), 50);
+
+    // Enter Key Press Event for Login
+    const loginInputs = document.querySelectorAll('#username, #password');
+    loginInputs.forEach(input => {
+        input.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                handleLogin();
+            }
+        });
+    });
 };
 
 function typeWriterEffect(text, element, speed) {
